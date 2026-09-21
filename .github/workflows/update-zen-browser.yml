@@ -51,7 +51,7 @@ jobs:
         run: |
           # Docker compose will dynamically create build_artifacts folder due to the volume mapping
           docker compose build
-          docker compose up
+          docker compose up --abort-on-container-exit --exit-code-from zen-deb-builder
 
       - name: Upload Built DEB as Artifact
         if: steps.check_update.outputs.build_required == 'true'

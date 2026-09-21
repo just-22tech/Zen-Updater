@@ -69,7 +69,7 @@ fi
 find "$BUILD_DIR" -type d -exec chmod 755 {} +
 find "$BUILD_DIR" -type f -exec chmod ugo+r {} +
 chmod +x "$BUILD_DIR/opt/zen/zen" "$BUILD_DIR/opt/zen/zen-bin" 2>/dev/null || true
-chmod -h 777 "$BUILD_DIR/usr/bin/zen"
+# chmod 777 "$BUILD_DIR/usr/bin/zen"
 
 echo "=> Packing the final .deb file..."
 dpkg-deb -b "$BUILD_DIR" "$OUTPUT_DIR/$DEB_NAME"
