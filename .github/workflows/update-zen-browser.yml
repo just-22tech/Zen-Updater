@@ -1,0 +1,70 @@
+name: Daily Zen Browser DEB Builder
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check for Zen Browser Updates
+        id: check_update
+        run: |
+          echo "=> Fetching latest tag from Zen Browser..."
+          LATEST_TAG=$(curl -sL -w "%{url_effective}" -o /dev/null https://github.com/zen-browser/desktop/releases/latest | grep -o '[^/]*$')
+          echo "Found latest upstream tag: $LATEST_TAG"
+
+          if [ -z "$LATEST_TAG" ] || [[ "$LATEST_TAG" == *"releases"* ]]; then
+              echo "Error: Could not fetch the latest repo tag."
+              exit 1
+          fi
+
+          LAST_VERSION=""
+          if [ -f ".github/latest_version.txt" ]; then
+            LAST_VERSION=$(cat .github/latest_version.txt)
+          fi
+          echo "Our last built version: $LAST_VERSION"
+
+          if [ "$LATEST_TAG" == "$LAST_VERSION" ]; then
+            echo "✅ No update available. Current version ($LATEST_TAG) is already built. Skipping!"
+            echo "build_required=false" >> $GITHUB_OUTPUT
+          else
+            echo "🚀 Update found! ($LAST_VERSION -> $LATEST_TAG). Proceeding to build."
+            echo "build_required=true" >> $GITHUB_OUTPUT
+            echo "$LATEST_TAG" > .github/latest_version.txt
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.check_update.outputs.build_required == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run DEB Builder via Docker Compose
+        if: steps.check_update.outputs.build_required == 'true'
+        run: |
+          # Docker compose will dynamically create build_artifacts folder due to the volume mapping
+          docker compose build
+          docker compose up
+
+      - name: Upload Built DEB as Artifact
+        if: steps.check_update.outputs.build_required == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: zen-browser-deb
+          path: build_artifacts/*.deb
+
+      - name: Commit Updated Version Tracker
+        if: steps.check_update.outputs.build_required == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add .github/latest_version.txt
+          git commit -m "chore: auto-update tracking version to $(cat .github/latest_version.txt) [skip ci]" || echo "No changes to commit"
+          git push
