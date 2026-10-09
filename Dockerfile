@@ -1,13 +1,7 @@
 FROM ubuntu:24.04
 
-RUN apt-get update && apt-get install -y \
-    bash \
-    curl \
-    jq \
-    xz-utils \
-    tar \
-    dpkg-dev \
-    fakeroot \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash curl jq xz-utils tar dpkg-dev fakeroot \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

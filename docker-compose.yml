@@ -1,11 +1,9 @@
 services:
   zen-deb-builder:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     container_name: zen-deb-builder
     environment:
-      - TZ=UTC
+      - ZEN_VERSION=${ZEN_VERSION}
     volumes:
       - ./build_artifacts:/app/output
     restart: "no"

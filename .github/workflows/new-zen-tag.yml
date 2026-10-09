@@ -1,0 +1,57 @@
+name: Build and Release
+
+on:
+  repository_dispatch:
+    types: [new_zen_tag]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate tag
+        id: tag
+        run: |
+          TAG="${{ github.event.client_payload.tag }}"
+          if [ -z "$TAG" ]; then
+            echo "No tag in payload" >&2
+            exit 1
+          fi
+          echo "version=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Check for existing release
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_PERSONAL_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.version }}"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists, skipping."
+            exit 0
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build .deb package
+        env:
+          ZEN_VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          docker compose build
+          docker compose run -e ZEN_VERSION="$ZEN_VERSION" zen-deb-builder
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_PERSONAL_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.version }}"
+          DEB_FILE=$(find build_artifacts -name "*.deb" | head -n 1)
+
+          if [ -z "$DEB_FILE" ]; then
+            echo "No .deb file found" >&2
+            exit 1
+          fi
+
+          gh release create "$TAG" "$DEB_FILE" \
+            --title "Zen Browser $TAG" \
+            --notes "Automated .deb build for Zen Browser $TAG." \
+            --target main
